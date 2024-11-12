@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Response
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from tldextract import tldextract
 import requests
@@ -11,23 +11,35 @@ class URL(BaseModel):
 
 app = FastAPI()
 
-@app.get("/fetchfavicon/")
-async def send_file(url: URL):
-    filepath = fetch_favicon(url.url) 
-    return FileResponse(filepath)
+@app.get("/fetchfavicon/", status_code=200)
+async def send_file(url: URL, response: Response):
+    extracted = tldextract.extract(url.url)
 
-def fetch_favicon(url=URL):
-    extracted = tldextract.extract(url)
-    domain = extracted.subdomain + "." + extracted.domain + "." + extracted.suffix
-
-    favicon_url = f"https://{domain}/favicon.ico"
-    response = requests.get(favicon_url, headers=UA_header)
-
-    filepath = f'./assets/{extracted.domain}.png'
+    if extracted.subdomain != '':
+        domain = extracted.subdomain + "." + extracted.domain + "." + extracted.suffix
+    else:
+        domain = extracted.domain + "." + extracted.suffix
     
-    open(filepath, 'wb').write(response.content)
+    favicon_url = f"https://{domain}/favicon.ico"
 
-    return filepath
+    try:
+        fav = requests.get(favicon_url, headers=UA_header, allow_redirects=True)
+        if fav.status_code == 200:
+            filepath = f'./assets/{extracted.domain}.png'
+            open(filepath, 'wb').write(fav.content)
+            return FileResponse(filepath)
+        else:
+            return error_response(response, url)
+
+    except (requests.exceptions.InvalidURL, requests.exceptions.SSLError):
+        return error_response(response, url)
+         
+
+def error_response(response: Response, url:URL):
+    response.status_code = 404
+    error_response = {"Error": f"Could not locate favicon for {url.url}."} 
+    return error_response
+    
 
 # to debug ##
 import uvicorn
