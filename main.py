@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Response
-from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from tldextract import tldextract
 import requests
@@ -12,7 +11,7 @@ class URL(BaseModel):
 app = FastAPI()
 
 @app.get("/fetchfavicon/", status_code=200)
-async def send_file(url: URL, response: Response):
+async def fetch_favicon(url: URL, response: Response):
     extracted = tldextract.extract(url.url)
 
     if extracted.subdomain != '':
@@ -25,23 +24,14 @@ async def send_file(url: URL, response: Response):
     try:
         fav = requests.get(favicon_url, headers=UA_header, allow_redirects=True)
         if fav.status_code == 200:
-            filepath = f'./assets/{extracted.domain}.png'
-            open(filepath, 'wb').write(fav.content)
-            return FileResponse(filepath)
+            return Response(content=fav.content, media_type="image/png") 
         else:
             return error_response(response, url)
 
     except (requests.exceptions.InvalidURL, requests.exceptions.SSLError):
         return error_response(response, url)
          
-
 def error_response(response: Response, url:URL):
     response.status_code = 404
     error_response = {"Error": f"Could not locate favicon for {url.url}."} 
     return error_response
-    
-
-# to debug ##
-import uvicorn
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
