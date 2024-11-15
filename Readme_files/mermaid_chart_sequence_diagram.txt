@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant Client
+    participant Favicon Fetcher
+    activate Favicon Fetcher
+    participant Third-party URL
+
+    Note left of Client: Client requests<br> with URL in<br> request body
+    activate Client
+    Client->>Favicon Fetcher: GET /fetchfavicon
+
+    Favicon Fetcher->>Favicon Fetcher: prepare_domain()
+    Favicon Fetcher->>Third-party URL: fetch_favicon()
+
+    activate Third-party URL
+        Note right of Third-party URL: Favicon Fetcher<br>attempts to locate<br>favicon at<br>provided url
+    alt favicon found    
+        Third-party URL->>Favicon Fetcher: favicon.ico
+        Note right of Third-party URL: If located <br>return image
+        Favicon Fetcher ->> Client: '200 OK'<br>favicon as image
+        Note left of Client: Receive image
+    else favicon not found
+        Note right of Third-party URL: If not located<br>return error
+        Third-party URL->>Favicon Fetcher: error
+        deactivate Third-party URL
+        Favicon Fetcher ->> Client: '404 Not Found'<br>error
+        Note left of Client: Receive error
+        deactivate Client
+    end
+    deactivate Favicon Fetcher
